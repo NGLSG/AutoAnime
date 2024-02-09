@@ -29,6 +29,7 @@ class AnimeInfo:
 class UserInfo:
     userName: str
     passwd: str
+    waitTime: int
 
 
 class RssInfo:
@@ -48,6 +49,7 @@ def GetUserInfo() -> UserInfo:
         config = yaml.load(ymlfile, Loader=yaml.FullLoader)
     userInfo.userName = config['userName']
     userInfo.passwd = config['passwd']
+    userInfo.waitTime = config['waitTime']
     return userInfo
 
 
@@ -222,7 +224,6 @@ async def UpdateAnime():
     logger.info("Service start")
     logger.info("Log in PikPak drive")
     userinfo = GetUserInfo()
-    rssinfo = RssReader()
     client = PikPakApi(
         username=userinfo.userName,
         password=userinfo.passwd,
@@ -230,6 +231,7 @@ async def UpdateAnime():
     await client.login()
     while True:
         try:
+            rssinfo = RssReader()
             tasks = []
             for rss in rssinfo:
                 if rss.State != State.HANDLING:
@@ -240,7 +242,8 @@ async def UpdateAnime():
             # 并行处理多个RSS任务
             await asyncio.gather(*tasks)
 
-            await asyncio.sleep(60 * 30)  # 等待30分钟后重新执行
+            await asyncio.sleep(userinfo.waitTime)  # 等待30分钟后重新执行
+
         except Exception as e:
             logger.error(f"An error occurred: {e}")
             logger.info("Waiting for 5 seconds before retrying...")

@@ -1,2 +1,3 @@
 userName: "region+phoneNumber or email"
 passwd: "passwd"
+waitTime: 60
