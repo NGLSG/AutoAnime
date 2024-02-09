@@ -182,7 +182,7 @@ def GenerateUUID(Symbol: str) -> str:
 async def PushAnime(client: PikPakApi, rssinfo: RssInfo) -> None:
     ids = await client.path_to_id(rssinfo.animeName, True)
     id = ids[0]['id']
-    logger.info(f"Get anime info {rssinfo.animeName} from rss source")
+    logger.info(f"Get anime info {rssinfo.animeName}({rssinfo.uuid}) from rss source")
 
     # 初始化索引值
     start_index = 0
