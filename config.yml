@@ -1,3 +1,5 @@
-userName: "region+phoneNumber or email"
+userName: "eg:+86..."
 passwd: "passwd"
+url: "if you are using pikpak make it empty"
+drive: 1
 waitTime: 60

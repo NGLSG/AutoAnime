@@ -3,12 +3,12 @@ Anime:
     {
       animeName: "夢想成為魔法少女",
       translationGroup: "轻之国度",
-      links: "https://share.dmhy.org/topics/rss/rss.xml?keyword=%E6%A2%A6%E6%83%B3%E6%88%90%E4%B8%BA%E9%AD%94%E6%B3%95%E5%B0%91%E5%A5%B3"
+      links: "https://garden.onekuma.cn/feed.xml?filter=[{%22include%22:[%22%E5%A4%A2%E6%83%B3%E6%88%90%E7%82%BA%E9%AD%94%E6%B3%95%E5%B0%91%E5%A5%B3%22],%22keywords%22:[%22%E8%BD%BB%E4%B9%8B%E5%9B%BD%E5%BA%A6%22]}]"
     },
     {
       animeName: "葬送的芙莉蓮",
       translationGroup: "ANi",
-      links: "https://share.dmhy.org/topics/rss/rss.xml?keyword=%E8%91%AC%E9%80%81%E7%9A%84%E8%8A%99%E8%8E%89%E8%93%AE"
+      links: "https://garden.onekuma.cn/feed.xml?filter=[{%22include%22:[%22%E8%91%AC%E9%80%81%E7%9A%84%E8%8A%99%E8%8E%89%E8%8E%B2%22],%22keywords%22:[%22ANi%22],%22exclude%22:[%22CheeseANi%22]}]"
     }
 
   ]

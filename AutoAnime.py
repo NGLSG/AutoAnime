@@ -9,10 +9,16 @@ from pikpakapi import PikPakApi
 import feedparser
 import logging
 import yaml
+import AList
 from enum import Enum
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+class DriveStatus(Enum):
+    AList = 1
+    PikPak = 2
 
 
 class State(Enum):
@@ -30,6 +36,8 @@ class UserInfo:
     userName: str
     passwd: str
     waitTime: int
+    url: str
+    drive: DriveStatus
 
 
 class RssInfo:
@@ -50,6 +58,8 @@ def GetUserInfo() -> UserInfo:
     userInfo.userName = config['userName']
     userInfo.passwd = config['passwd']
     userInfo.waitTime = config['waitTime']
+    userInfo.drive = config['drive']
+    userInfo.url = config['url']
     return userInfo
 
 
@@ -179,77 +189,152 @@ def GenerateUUID(Symbol: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, Symbol))
 
 
-async def PushAnime(client: PikPakApi, rssinfo: RssInfo) -> None:
-    ids = await client.path_to_id(rssinfo.animeName, True)
-    id = ids[0]['id']
-    logger.info(f"Get anime info {rssinfo.animeName}({rssinfo.uuid}) from rss source")
+class PikPak:
+    async def PushAnime(self, client: PikPakApi, rssinfo: RssInfo) -> None:
+        ids = await client.path_to_id(rssinfo.animeName, True)
+        id = ids[0]['id']
+        logger.info(f"Get anime info {rssinfo.animeName}({rssinfo.uuid}) from rss source")
 
-    # 初始化索引值
-    start_index = 0
-    if rssinfo.lastIndex == 0:
-        rssinfo.animeList = GetAnime(rssinfo)
+        # 初始化索引值
+        start_index = 0
+        if rssinfo.lastIndex == 0:
+            rssinfo.animeList = GetAnime(rssinfo)
 
-        # 如果之前已经处理过部分动画信息，从上次中断的位置开始处理
-    if rssinfo.State == State.HANDLING:
-        start_index = rssinfo.lastIndex
+            # 如果之前已经处理过部分动画信息，从上次中断的位置开始处理
+        if rssinfo.State == State.HANDLING:
+            start_index = rssinfo.lastIndex
 
-    try:
-        # 获取动画信息列表
-        anime = rssinfo.animeList
-
-        # 从上次中断的位置开始处理动画信息
-        for i in range(start_index, len(anime)):
-            ani = anime[i]
-            logger.info(f"Title: {ani.title}")
-            logger.info(f"Links: {ani.resourceLinks}")
-            await client.offline_download(
-                file_url=ani.resourceLinks,
-                parent_id=id,
-                name=ani.title
-            )
-            # 记录已处理的索引值
-            rssinfo.lastIndex = i + 1
-
-    except Exception as e:
-        rssinfo.State = State.WAITING
-        raise Exception(e)
-
-    logger.info("Finished")
-    rssinfo.lastIndex = 0
-    rssinfo.animeList = []
-    rssinfo.State = State.WAITING
-
-
-async def UpdateAnime():
-    logger.info("Service start")
-    logger.info("Log in PikPak drive")
-    userinfo = GetUserInfo()
-    client = PikPakApi(
-        username=userinfo.userName,
-        password=userinfo.passwd,
-    )
-    await client.login()
-    while True:
         try:
-            rssinfo = RssReader()
-            tasks = []
-            for rss in rssinfo:
-                if rss.State != State.HANDLING:
-                    rss.State = State.HANDLING
-                    rss.uuid = GenerateUUID(rss.animeName)
-                    tasks.append(asyncio.create_task(PushAnime(client, rss)))
+            # 获取动画信息列表
+            anime = rssinfo.animeList
 
-            # 并行处理多个RSS任务
-            await asyncio.gather(*tasks)
-
-            await asyncio.sleep(userinfo.waitTime)  # 等待30分钟后重新执行
+            # 从上次中断的位置开始处理动画信息
+            for i in range(start_index, len(anime)):
+                ani = anime[i]
+                logger.info(f"Title: {ani.title}")
+                logger.info(f"Links: {ani.resourceLinks}")
+                await client.offline_download(
+                    file_url=ani.resourceLinks,
+                    parent_id=id,
+                    name=ani.title
+                )
+                # 记录已处理的索引值
+                rssinfo.lastIndex = i + 1
 
         except Exception as e:
-            logger.error(f"An error occurred: {e}")
-            logger.info("Waiting for 5 seconds before retrying...")
-            await asyncio.sleep(5)  # 等待5秒后重新执行
+            rssinfo.State = State.WAITING
+            raise Exception(e)
+
+        logger.info("Finished")
+        rssinfo.lastIndex = 0
+        rssinfo.animeList = []
+        rssinfo.State = State.WAITING
+
+    async def UpdateAnime(self):
+        logger.info("Service start")
+        logger.info("Log in PikPak drive")
+        client = PikPakApi(
+            username=userinfo.userName,
+            password=userinfo.passwd,
+        )
+        await client.login()
+        while True:
+            try:
+                rssinfo = RssReader()
+                tasks = []
+                for rss in rssinfo:
+                    if rss.State != State.HANDLING:
+                        rss.State = State.HANDLING
+                        rss.uuid = GenerateUUID(rss.animeName)
+                        tasks.append(asyncio.create_task(self.PushAnime(client, rss)))
+
+                # 并行处理多个RSS任务
+                await asyncio.gather(*tasks)
+
+                await asyncio.sleep(userinfo.waitTime)  # 等待30分钟后重新执行
+
+            except Exception as e:
+                logger.error(f"An error occurred: {e}")
+                logger.info("Waiting for 5 seconds before retrying...")
+                await asyncio.sleep(5)  # 等待5秒后重新执行
 
 
+class alist:
+    async def PushAnime(self, rssinfo: RssInfo) -> None:
+        AList.MakeDir("Animation/" + rssinfo.animeName)
+        logger.info(f"Get anime info {rssinfo.animeName}({rssinfo.uuid}) from rss source")
+
+        # 初始化索引值
+        start_index = 0
+        if rssinfo.lastIndex == 0:
+            rssinfo.animeList = GetAnime(rssinfo)
+
+            # 如果之前已经处理过部分动画信息，从上次中断的位置开始处理
+        if rssinfo.State == State.HANDLING:
+            start_index = rssinfo.lastIndex
+
+        try:
+            # 获取动画信息列表
+            anime = rssinfo.animeList
+
+            # 从上次中断的位置开始处理动画信息
+            for i in range(start_index, len(anime)):
+                ani = anime[i]
+                logger.info(f"Title: {ani.title}")
+                logger.info(f"Links: {ani.resourceLinks}")
+                AList.Aria2("Animation/" + rssinfo.animeName,
+                            'magnet:?xt=urn:btih:' + ani.resourceLinks.split('magnet:?xt=urn:btih:')[1].split("\'")[
+                                0])
+                # 记录已处理的索引值
+                rssinfo.lastIndex = i + 1
+
+        except Exception as e:
+            rssinfo.State = State.WAITING
+            raise Exception(e)
+
+        logger.info("Finished")
+        rssinfo.lastIndex = 0
+        rssinfo.animeList = []
+        rssinfo.State = State.WAITING
+
+    async def UpdateAnime(self):
+        while True:
+            try:
+                rssinfo = RssReader()
+                tasks = []
+                for rss in rssinfo:
+                    if rss.State != State.HANDLING:
+                        rss.State = State.HANDLING
+                        rss.uuid = GenerateUUID(rss.animeName)
+                        tasks.append(asyncio.create_task(self.PushAnime(rss)))
+
+                # 并行处理多个RSS任务
+                await asyncio.gather(*tasks)
+
+                await asyncio.sleep(userinfo.waitTime)  # 等待30分钟后重新执行
+
+            except Exception as e:
+                logger.error(f"An error occurred: {e}")
+                logger.info("Waiting for 5 seconds before retrying...")
+                await asyncio.sleep(5)  # 等待5秒后重新执行
+
+
+userinfo = GetUserInfo()
 if __name__ == "__main__":
-    print(RssReader())
-    asyncio.run(UpdateAnime())
+
+    if userinfo.drive == DriveStatus.AList.value:
+        Drive = alist()
+        if not userinfo.url:
+            logger.error(f"You`re using AList but no URL")
+        AList.url = userinfo.url
+        AList.Authorization = AList.getToken(userinfo.userName, userinfo.passwd)
+        AList.headers = {
+            'UserAgent': AList.UserAgent,
+            'Authorization': str(AList.Authorization)[55:-3]
+        }
+
+    elif userinfo.drive == DriveStatus.PikPak.value:
+        Drive = PikPak()
+    else:
+        exit(-1)
+    asyncio.run(Drive.UpdateAnime())
